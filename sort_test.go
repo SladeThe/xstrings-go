@@ -1,6 +1,8 @@
 package xstrings
 
 import (
+	"encoding/hex"
+	"math/rand"
 	"strings"
 	"testing"
 
@@ -266,6 +268,18 @@ var numericLessTests = []struct {
 	want: numericLessWant{less: true},
 }}
 
+func TestNumericLess(t *testing.T) {
+	test := func(a numericLessArgs, w numericLessWant) func(t *testing.T) {
+		return func(t *testing.T) {
+			assert.Equal(t, w.less, NumericCompare(a.a, a.b) < 0, "invalid less")
+		}
+	}
+
+	for _, tt := range numericLessTests {
+		t.Run(tt.name, test(tt.args, tt.want))
+	}
+}
+
 func BenchmarkNumericLess(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		for _, tt := range numericLessTests {
@@ -276,14 +290,28 @@ func BenchmarkNumericLess(b *testing.B) {
 	}
 }
 
-func TestNumericLess(t *testing.T) {
-	test := func(a numericLessArgs, w numericLessWant) func(t *testing.T) {
-		return func(t *testing.T) {
-			assert.Equal(t, w.less, NumericLess(a.a, a.b), "invalid less")
-		}
+func BenchmarkNumericSort(b *testing.B) {
+	const (
+		minLengthBytes = 0
+		maxLengthBytes = 10
+		count          = 100_000
+	)
+
+	rnd := rand.New(rand.NewSource(9788763132))
+
+	originalSlice := make([]string, count)
+	copiedSlice := make([]string, count)
+
+	for i := 0; i < count; i++ {
+		lengthBytes := minLengthBytes + rnd.Intn(maxLengthBytes-minLengthBytes+1)
+		bytes := make([]byte, lengthBytes)
+		rnd.Read(bytes)
+
+		originalSlice[i] = hex.EncodeToString(bytes)
 	}
 
-	for _, tt := range numericLessTests {
-		t.Run(tt.name, test(tt.args, tt.want))
+	for i := 0; i < b.N; i++ {
+		copy(copiedSlice, originalSlice)
+		NumericSort(copiedSlice)
 	}
 }

@@ -1,15 +1,20 @@
 package xstrings
 
 import (
-	"sort"
+	"slices"
 	"unicode/utf8"
 )
 
-// NumericLess compares strings with respect to values of nonnegative integer groups.
+// NumericLess is a shortcut for NumericCompare(a, b) < 0.
+func NumericLess(a, b string) bool {
+	return NumericCompare(a, b) < 0
+}
+
+// NumericCompare compares strings with respect to values of nonnegative integer groups.
 // For example, 'a9z' is considered less than 'a11z', because 9 < 11.
 // If two numbers with leading zeroes have the same value, the shortest of them is considered less, i.e. 12 < 012.
 // Digits and non-digits are compared lexicographically, i.e. ' ' (space) < 5 < 'a'.
-func NumericLess(a, b string) bool {
+func NumericCompare(a, b string) int {
 	nextA := func() (rune, int) {
 		r, size := utf8.DecodeRuneInString(a)
 		a = a[size:]
@@ -25,16 +30,16 @@ func NumericLess(a, b string) bool {
 	for {
 		runeA, offsetA := nextA()
 		if offsetA == 0 {
-			return b != ""
+			return negativeOrZero(b != "")
 		}
 
 		runeB, offsetB := nextB()
 		if offsetB == 0 {
-			return false
+			return 1
 		}
 
 		if digitA, digitB := isDigit(runeA), isDigit(runeB); digitA != digitB {
-			return runeA < runeB
+			return negativeOrOne(runeA < runeB)
 		} else if digitA {
 			zeroBalance := 0
 			digitCmp := 0
@@ -50,21 +55,21 @@ func NumericLess(a, b string) bool {
 			}
 
 			if offsetA == 0 {
-				return offsetB != 0 || zeroBalance < 0
+				return negativeOrZero(offsetB != 0 || zeroBalance < 0)
 			}
 
 			if offsetB == 0 {
-				return false
+				return 1
 			}
 
 			if digitA, digitB = isDigit(runeA), isDigit(runeB); !digitA && !digitB {
 				if zeroBalance != 0 {
-					return zeroBalance < 0
+					return negativeOrOne(zeroBalance < 0)
 				} else if runeA != runeB {
-					return runeA < runeB
+					return negativeOrOne(runeA < runeB)
 				}
 			} else if digitA != digitB {
-				return digitB
+				return negativeOrZero(digitB)
 			} else {
 				for {
 					if digitCmp == 0 && runeA != runeB {
@@ -79,26 +84,26 @@ func NumericLess(a, b string) bool {
 					runeB, offsetB = nextB()
 
 					if digitA, digitB = isDigit(runeA), isDigit(runeB); digitA != digitB {
-						return digitB
+						return negativeOrOne(digitB)
 					} else if !digitA {
 						if digitCmp != 0 {
-							return digitCmp < 0
+							return negativeOrOne(digitCmp < 0)
 						}
 
 						if zeroBalance != 0 {
-							return zeroBalance < 0
+							return negativeOrOne(zeroBalance < 0)
 						}
 
 						if offsetA == 0 {
-							return offsetB != 0
+							return negativeOrZero(offsetB != 0)
 						}
 
 						if offsetB == 0 {
-							return false
+							return 1
 						}
 
 						if runeA != runeB {
-							return runeA < runeB
+							return negativeOrOne(runeA < runeB)
 						}
 
 						break
@@ -106,17 +111,32 @@ func NumericLess(a, b string) bool {
 				}
 			}
 		} else if runeA != runeB {
-			return runeA < runeB
+			return negativeOrOne(runeA < runeB)
 		}
 	}
+}
+
+// NumericSort sorts the given slice using NumericCompare.
+func NumericSort(s []string) {
+	slices.SortFunc(s, NumericCompare)
 }
 
 func isDigit(r rune) bool {
 	return '0' <= r && r <= '9'
 }
 
-func NumericSort(s []string) {
-	sort.Slice(s, func(i, j int) bool {
-		return NumericLess(s[i], s[j])
-	})
+func negativeOrZero(condition bool) int {
+	if condition {
+		return -1
+	}
+
+	return 0
+}
+
+func negativeOrOne(condition bool) int {
+	if condition {
+		return -1
+	}
+
+	return 1
 }
